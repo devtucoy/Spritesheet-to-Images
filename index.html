@@ -5,7 +5,10 @@
         <link rel="stylesheet" href="style.css">
         <title>MSM spritesheet to images converter</title>
         <link rel="icon" type="image/x-icon" href="icon.ico">
-    </head>
+    
+        <script src="script.js"></script>
+    
+      </head>
    <body>
         <!-- by AimeePlaysMSM and TUCOY -->
     <h1>Sprite sheet to images converter</h1>
@@ -31,9 +34,8 @@
         <button id="dlall" disabled="disabled">download all sprites (ZIP)</button></div>
     
         
-    
-    <script type="text/javascript">
-    
+    <script>
+      
     let spriteRects = [];
     let spriteName = "";
     let lutdata;
@@ -190,8 +192,9 @@
             saveAs(content, `${spriteName.slice(0, -4)}-sprites.zip`);
         });
     }
-    
-      </script><script>
+    </script>
+
+    <script>
         // tell the embed parent frame the height of the content
         if (window.parent && window.parent.parent){
           window.parent.parent.postMessage(["resultsFrame", {
@@ -202,7 +205,7 @@
     
         // always overwrite window.name, in case users try to set it manually
         window.name = "result"
-      </script>
+    </script>
     
         <script>
           let allLines = []
