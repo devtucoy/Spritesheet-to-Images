@@ -13,6 +13,8 @@ body {
     background-image: url("logging_in.avif");
     background-position: center;
     background-size: cover;
+    align-content: center;
+
 }
 h1 {
     font-size: 350%;
