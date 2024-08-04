@@ -1,0 +1,226 @@
+<html>
+    <head>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.min.js"></script>
+        <link rel="stylesheet" href="style.css">
+        <title>MSM spritesheet to images converter</title>
+        <link rel="icon" type="image/x-icon" href="icon.ico">
+    </head>
+   <body>
+        <!-- by AimeePlaysMSM and TUCOY -->
+    <h1>Sprite sheet to images converter</h1>
+    <div class="container">    
+        <small>ox, oy, ow, oh are ignored. red outline = rotated sprite. 
+        mouseover to view label. 
+        premultiplier and de-premultiplied alpha output supported. 
+        click to download sprite with rotation corrected.
+        click download button to download all as a ZIP.</small><br>
+        Sprite bitmap:<br>
+        <input id="sprite" type="file" accept=".avif"><input id="depre" type="checkbox" checked="checked"><label for="depre" title="removes black fringing, but check with your graphics software to see what it expects">de-premultiply alpha</label><br>
+        Sprite XML:<br>
+        <input id="xml" type="file" accept=".xml" disabled="disabled">
+        <span id="xmldata"></span>
+        <hr>
+        Sheet:<br>
+        <img id="spriteimg" style="display:none;"><!-- need to keep one in memory for reference anyway -->
+        <div style="display:flex; flex-flow:row wrap; align-items:flex-start; justify-content:start;">
+        <canvas id="spritecnv" style="display:none;"></canvas>
+        <span id="spritename"></span>
+        </div>
+        <canvas id="lutcnv" style="display:none;"></canvas> <!-- ditto -->
+        <button id="dlall" disabled="disabled">download all sprites (ZIP)</button></div>
+    
+        
+    
+    <script type="text/javascript">
+    
+    let spriteRects = [];
+    let spriteName = "";
+    let lutdata;
+    sprite.onclick = function () {
+        sprite.value = "";
+      xml.disabled = true;
+      dlall.disabled = true;
+      spritecnv.style.display = "none";
+    }
+    sprite.onchange = function () {
+      spriteimg.onload = function() {
+          xml.disabled = false;
+      }
+      spriteimg.src = window.URL.createObjectURL(sprite.files[0])
+      spriteName = sprite.value.replace(/^.*[\\\/]/, '');
+    };
+    xml.onclick = function () {
+        xml.value = "";
+    }
+    xml.onchange = function () {
+          const file = xml.files[0];
+          const fr = new FileReader();
+          fr.onload = function (e) {
+            const parser = new DOMParser();
+                const data = parser.parseFromString(e.target.result, "text/xml");
+          const atlas = data.getElementsByTagName("TextureAtlas")[0];
+          const sprites = atlas.getElementsByTagName("sprite");
+          const numSprites = sprites.length;
+          xmldata.textContent = `Sprites found: ${numSprites}`;
+    
+          spritecnv.width = lutcnv.width = spriteimg.naturalWidth;
+          spritecnv.height = lutcnv.height = spriteimg.naturalHeight;
+          const ctx = spritecnv.getContext("2d");
+          const lutctx = lutcnv.getContext("2d");
+          ctx.drawImage(spriteimg,0,0);
+          ctx.imageSmoothingEnabled = false;
+          lutctx.imageSmoothingEnabled = false;
+    
+                if (depre.checked) {
+            // de-premultiply the sprite
+            const imageData = ctx.getImageData(0,0,spritecnv.width,spritecnv.height);
+            const pixels = imageData.data;
+            const pixelsLen = pixels.length;
+            for (let i = 0; i < pixelsLen; i += 4) {
+              const a = pixels[i+3]; // Alpha
+              if ((a < 255) && (a > 0)) {
+                const mult = a / 255.0
+                pixels[i] /= mult; // Red
+                pixels[i + 1] /= mult; // Green
+                pixels[i + 2] /= mult; // Blue
+              }
+            }
+            ctx.putImageData(imageData,0,0);
+          }
+          
+          ctx.translate(0.5, 0.5); // to fix blurry edges
+          // lutctx.translate(0.5, 0.5);
+          for (let i = 0; i < numSprites; i += 1) {
+              const spriteData = sprites[i];
+            const rect = {
+              n: spriteData.getAttribute("n"),
+                x: parseInt(spriteData.getAttribute("x"),10),
+                y: parseInt(spriteData.getAttribute("y"),10),
+                w: parseInt(spriteData.getAttribute("w"),10),
+                h: parseInt(spriteData.getAttribute("h"),10),
+                oX: parseInt(spriteData.getAttribute("oX"),10),
+                oY: parseInt(spriteData.getAttribute("oY"),10),
+                oW: parseInt(spriteData.getAttribute("oW"),10),
+                oH: parseInt(spriteData.getAttribute("oH"),10),
+                r: spriteData.getAttribute("r") === "y" ? true : false
+            }
+            spriteRects[i] = rect;
+            ctx.beginPath();
+                    ctx.lineWidth = 1;
+            ctx.strokeStyle = rect.r ? "red" : "blue";
+                    ctx.rect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2); // offset margins
+                    ctx.stroke();
+            lutctx.fillStyle = `rgb(${i+1},0,0)`;
+            lutctx.fillRect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
+          }
+          ctx.translate(-0.5, -0.5); // reset from: to fix blurry edges
+          lutctx.translate(-0.5, -0.5);
+          lutdata = lutctx.getImageData(0,0,lutcnv.width,lutcnv.height).data;
+          spritecnv.style.display = "block";
+          dlall.disabled = false;
+            }
+          fr.readAsText(file);
+    };
+    spritecnv.onmousemove = function (e) {
+      const rect = spritecnv.getBoundingClientRect();
+      const mousePos = {x: parseInt(e.clientX - rect.x,10), y:parseInt(e.clientY - rect.y,10)};
+      const spriteIndex = lutdata[mousePos.y * 4 * lutcnv.width + mousePos.x * 4] - 1;
+      spritename.textContent = spriteIndex > -1 ? spritename.textContent = spriteRects[spriteIndex].n : "";
+    }
+    spritecnv.onclick = function (e) {
+      const rect = spritecnv.getBoundingClientRect();
+      const mousePos = {x: parseInt(e.clientX - rect.x,10), y:parseInt(e.clientY - rect.y,10)};
+      const spriteIndex = lutdata[mousePos.y * 4 * lutcnv.width + mousePos.x * 4] - 1;
+      
+      if (spriteIndex > -1) {
+          downloadSprite(spriteName.slice(0, -4),spriteIndex);
+      }
+    }
+    depre.onchange = function () {
+      if (!xml.disabled) {
+            xml.onchange();
+      }
+    }
+    getSprite = function (index) {
+      let cnv = document.createElement("canvas");
+      const spriteData = spriteRects[index];
+      cnv.width = spriteData.w;
+      cnv.height = spriteData.h;
+      const ctx = cnv.getContext("2d");
+      
+      ctx.drawImage(spriteimg,spriteData.x,spriteData.y,spriteData.w,spriteData.h,0,0,spriteData.w,spriteData.h);
+      if (spriteData.r) {
+          const cnvR = document.createElement("canvas");
+        cnvR.width = cnv.height;
+        cnvR.height = cnv.width;
+        const ctxR = cnvR.getContext("2d");
+          ctxR.save();
+        ctxR.translate(cnvR.width / 2, cnvR.height / 2);
+        ctxR.rotate(-Math.PI / 2);
+          ctxR.drawImage(cnv,-cnv.width / 2, -cnv.height / 2);
+          ctxR.restore();
+        cnv = cnvR
+      }
+      return cnv;
+    }
+    downloadSprite = function (name,index) {
+      const link = document.createElement("a");
+      const sprite = getSprite(index);
+      link.href = sprite.toDataURL("image/png");
+      document.body.appendChild(link);
+      link.download = `${name} - ${spriteData.n}`;
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+    dlall.onclick = function () {
+      dlall.textContent = "Generating ZIP file...";
+      const zip = new JSZip();
+      for (let i = 0; i < spriteRects.length; i += 1) {
+          dlall.textContent = `Generating ZIP file... adding sprite ${i}/${spriteRects.length}`;
+          const sprite = getSprite(i);
+            zip.file(spriteRects[i].n + ".png", sprite.toDataURL("image/png").substr(22), {base64: true});
+      }
+      dlall.textContent = "Generating ZIP file... compressing";
+        zip.generateAsync({type:"blob"})
+        .then(function(content) {
+          dlall.textContent = "download all sprites (ZIP)";
+            // see FileSaver.js
+            saveAs(content, `${spriteName.slice(0, -4)}-sprites.zip`);
+        });
+    }
+    
+      </script><script>
+        // tell the embed parent frame the height of the content
+        if (window.parent && window.parent.parent){
+          window.parent.parent.postMessage(["resultsFrame", {
+            height: document.body.getBoundingClientRect().height,
+            slug: ""
+          }], "*")
+        }
+    
+        // always overwrite window.name, in case users try to set it manually
+        window.name = "result"
+      </script>
+    
+        <script>
+          let allLines = []
+    
+          window.addEventListener("message", (message) => {
+            if (message.data.console){
+              let insert = document.querySelector("#insert")
+              allLines.push(message.data.console.payload)
+              insert.innerHTML = allLines.join(";\r")
+    
+              let result = eval.call(null, message.data.console.payload)
+              if (result !== undefined){
+                console.log(result)
+              }
+            }
+          })
+        </script>
+    
+    
+    
+    </body></html>
