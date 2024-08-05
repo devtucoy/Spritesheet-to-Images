@@ -14,6 +14,7 @@ body {
     background-position: center;
     background-size: cover;
     align-content: center;
+    text-align: center;
 }
 h1 {
     font-size: 350%;
@@ -28,4 +29,5 @@ h1 {
     border-radius: 15px;
     padding: 5px 5px;
     font-size: large;
+
 }
